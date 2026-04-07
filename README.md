@@ -1,0 +1,11 @@
+This project implements a fully interactive binomial option pricing model using the Cox-Ross-Rubinstein (CRR) framework. Built entirely in the browser, it provides a fast and intuitive way to analyze option pricing dynamics, explore model behavior, and visualize key financial concepts without relying on external libraries or backend computation.
+
+At its core, the pricer constructs a recombining binomial tree to model the evolution of an underlying asset over discrete time steps. Using risk-neutral valuation, it computes option prices through backward induction, allowing for both European and American exercise styles. The model incorporates essential financial parameters including volatility, interest rates, dividend yield, and time to expiration, giving users full control over the pricing environment.
+
+Beyond pricing, the application extends into deeper quantitative analysis. It calculates option Greeks using central finite difference methods, offering insight into sensitivities such as delta, gamma, theta, vega, and rho. It also includes a Black-Scholes benchmark for European options, enabling users to evaluate convergence and accuracy as the number of binomial steps increases. This comparison highlights how discrete-time models approximate continuous-time solutions.
+
+The tool further supports implied volatility estimation by solving for the volatility input that matches a given market price. This is achieved through a numerical root-finding approach, making the model useful not only for pricing but also for market calibration.
+
+Visualization is a central component of the design. The interface presents convergence plots, payoff diagrams, and sensitivity charts, helping users build intuition around how option values respond to changes in underlying variables. Additionally, built-in arbitrage checks ensure that results remain financially consistent, reinforcing theoretical constraints such as the relationship between American and European option prices.
+
+Overall, this binomial pricer serves as both a practical computational tool and an educational platform. It bridges theory and application, allowing users to experiment with option pricing models, observe their behavior, and develop a deeper understanding of derivatives in a dynamic, interactive setting.
