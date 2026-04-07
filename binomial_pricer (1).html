@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Binomial Option Pricer — Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #020b14;
+  --bg2:      #070f1c;
+  --panel:    #0b1828;
+  --panel2:   #0f1f32;
+  --border:   #1a3050;
+  --border2:  #243d5c;
+  --green:    #00e5b0;
+  --green2:   #00a880;
+  --amber:    #f5a623;
+  --red:      #ff4d6a;
+  --blue:     #4da6ff;
+  --purple:   #9b6dff;
+  --text:     #c8daf0;
+  --text2:    #6a89a8;
+  --text3:    #3d5a78;
+  --mono:     'JetBrains Mono', monospace;
+  --display:  'Syne', sans-serif;
+  --glow-g:   0 0 16px rgba(0,229,176,0.25);
+  --glow-a:   0 0 16px rgba(245,166,35,0.25);
+  --glow-r:   0 0 16px rgba(255,77,106,0.25);
+  --rad:      6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* GRID BG */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,176,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,176,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── TOP NAR ── */
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 20px;
+  padding: 0 20px;
+  height: 48px;
+  background: rgba(2,11,20,0.97);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+.nav-logo {
+  font-family: var(--display);
+  font-weight: 800; font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.nav-logo span { color: var(--text2); font-weight: 400; }
+.nav-divider { width: 1px; height: 20px; background: var(--border); }
+.nav-ticker-display {
+  font-size: 11px; font-weight: 600;
+  color: var(--amber); letter-spacing: 0.1em;
+}
+.nav-price-display {
+  font-size: 13px; font-weight: 500; color: var(--text);
+}
+.nav-spacer { flex: 1; }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.status-label { font-size: 10px; color: var(--text2); letter-spacing: 0.08em; }
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity: 0.4; }
+}
+.nav-time { font-size: 11px; color: var(--text3); }
+
+/* ── LAYOUT ── */
+.main {
+  display: flex;
+  height: calc(100vh - 48px);
+  position: relative; z-index: 1;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 340px; flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.section-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.15em;
+  color: var(--text3); text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.section-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.input-group { display: flex; flex-direction: column; gap: 8px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label {
+  font-size: 10px; color: var(--text2); letter-spacing: 0.06em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.field label .hint { font-size: 9px; color: var(--text3); font-style: italic; }
+
+.field input[type="number"],
+.field input[type="text"],
+.field select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: var(--rad);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -moz-appearance: textfield;
+}
+.field input::-webkit-outer-spin-button,
+.field input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.field input:focus,
+.field select:focus {
+  border-color: var(--green);
+  box-shadow: var(--glow-g);
+}
+.field select { cursor: pointer; }
+.field select option { background: var(--panel2); }
+
+/* Toggle buttons */
+.toggle-group {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4px; background: var(--panel); border-radius: var(--rad);
+  padding: 3px; border: 1px solid var(--border);
+}
+.toggle-btn {
+  padding: 6px; text-align: center; border-radius: 4px;
+  cursor: pointer; font-family: var(--mono); font-size: 11px;
+  font-weight: 500; transition: all 0.15s; color: var(--text2);
+  background: transparent; border: none; letter-spacing: 0.05em;
+}
+.toggle-btn.active {
+  background: var(--green);
+  color: var(--bg);
+  box-shadow: var(--glow-g);
+}
+.toggle-btn.active.red { background: var(--red); box-shadow: var(--glow-r); }
+
+/* Two-col row */
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* CTA button */
+.btn-price {
+  width: 100%; padding: 13px;
+  background: var(--green);
+  color: var(--bg);
+  border: none; border-radius: var(--rad);
+  font-family: var(--display); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.2s;
+  box-shadow: var(--glow-g);
+  position: relative; overflow: hidden;
+}
+.btn-price:hover {
+  background: #00ffcc;
+  box-shadow: 0 0 30px rgba(0,229,176,0.5);
+  transform: translateY(-1px);
+}
+.btn-price:active { transform: translateY(0); }
+.btn-price.loading {
+  background: var(--panel2); color: var(--green);
+  border: 1px solid var(--green);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-price.loading::after {
+  content: '';
+  position: absolute; top: 50%; left: 50%; margin: -8px 0 0 -8px;
+  width: 16px; height: 16px;
+  border: 2px solid transparent; border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* IV mode toggle */
+.iv-mode-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--rad); padding: 7px 10px;
+}
+.iv-mode-row label { font-size: 10px; color: var(--text2); }
+.toggle-switch {
+  position: relative; width: 32px; height: 18px; cursor: pointer;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--border2); border-radius: 9px;
+  transition: 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  height: 12px; width: 12px; left: 3px; top: 3px;
+  background: var(--text2); border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--amber); }
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(14px);
+  background: var(--bg);
+}
+
+/* ── CONTENT AREA ── */
+.content {
+  flex: 1; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* SUMMARY STRIP */
+.summary-strip {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.summary-card {
+  padding: 10px 14px;
+  border-right: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.summary-card:last-child { border-right: none; }
+.summary-card .s-label {
+  font-size: 9px; color: var(--text3); letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.summary-card .s-value {
+  font-size: 18px; font-weight: 600; font-family: var(--display);
+  color: var(--text); line-height: 1;
+}
+.summary-card .s-value.green { color: var(--green); }
+.summary-card .s-value.amber { color: var(--amber); }
+.summary-card .s-value.red   { color: var(--red); }
+.summary-card .s-value.blue  { color: var(--blue); }
+.summary-card .s-sub {
+  font-size: 9px; color: var(--text3); margin-top: 3px;
+}
+.summary-card.highlight { background: rgba(0,229,176,0.05); }
+
+/* TAB NAV */
+.tab-nav {
+  display: flex; align-items: center; gap: 2px;
+  padding: 8px 16px 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab {
+  padding: 7px 14px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; color: var(--text3);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; text-transform: uppercase;
+  background: transparent; border-top: none; border-left: none; border-right: none;
+  font-family: var(--mono);
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* TAB PANELS */
+.tab-panels { flex: 1; overflow-y: auto; }
+.tab-panels::-webkit-scrollbar { width: 4px; }
+.tab-panels::-webkit-scrollbar-track { background: transparent; }
+.tab-panels::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.tab-panel { display: none; padding: 20px; }
+.tab-panel.active { display: block; }
+
+/* PLACEHOLDER STATE */
+.placeholder {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 200px; gap: 12px; opacity: 0.4;
+}
+.placeholder-icon { font-size: 32px; opacity: 0.5; }
+.placeholder-text { font-size: 11px; color: var(--text2); }
+
+/* PRICE TAB */
+.price-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 20px;
+}
+.price-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  padding: 14px 16px;
+  position: relative; overflow: hidden;
+}
+.price-card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; width: 3px; height: 100%;
+}
+.price-card.green-card::before { background: var(--green); }
+.price-card.amber-card::before { background: var(--amber); }
+.price-card.blue-card::before  { background: var(--blue); }
+.price-card.red-card::before   { background: var(--red); }
+
+.pc-label {
+  font-size: 9px; color: var(--text3); letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.pc-value {
+  font-size: 26px; font-weight: 700; font-family: var(--display);
+  line-height: 1;
+}
+.pc-value.green { color: var(--green); }
+.pc-value.amber { color: var(--amber); }
+.pc-value.blue  { color: var(--blue); }
+.pc-value.red   { color: var(--red); }
+.pc-sub { font-size: 10px; color: var(--text2); margin-top: 6px; }
+
+/* Model params table */
+.params-table {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  overflow: hidden; margin-bottom: 14px;
+}
+.params-table-title {
+  padding: 8px 14px;
+  background: var(--panel2);
+  font-size: 9px; color: var(--text3);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.params-row {
+  display: flex; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.params-row:last-child { border-bottom: none; }
+.params-row:hover { background: var(--panel2); }
+.pr-key { color: var(--text2); }
+.pr-val { color: var(--text); font-weight: 500; }
+.pr-val.green { color: var(--green); }
+.pr-val.amber { color: var(--amber); }
+
+/* arb checks */
+.checks-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.check-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.check-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.check-dot.pass { background: var(--green); box-shadow: var(--glow-g); }
+.check-dot.fail { background: var(--red); box-shadow: var(--glow-r); }
+.check-text { font-size: 10px; color: var(--text2); line-height: 1.4; }
+
+/* GREEKS TAB */
+.greeks-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 12px; margin-bottom: 20px;
+}
+.greek-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  padding: 14px;
+  text-align: center;
+}
+.greek-symbol {
+  font-family: var(--display); font-size: 22px; font-weight: 700;
+  margin-bottom: 6px;
+}
+.greek-name {
+  font-size: 9px; color: var(--text3); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.greek-value {
+  font-size: 18px; font-weight: 600;
+  font-family: var(--mono);
+}
+.greek-bar-track {
+  height: 3px; background: var(--border2);
+  border-radius: 2px; margin: 8px 0 4px;
+  overflow: hidden;
+}
+.greek-bar-fill {
+  height: 100%; border-radius: 2px;
+  transition: width 0.6s ease;
+}
+.greek-desc { font-size: 9px; color: var(--text3); line-height: 1.4; }
+
+/* CONVERGENCE TAB */
+.chart-container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  padding: 16px;
+  margin-bottom: 14px;
+  position: relative;
+}
+.chart-title {
+  font-size: 9px; color: var(--text3); letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+.chart-canvas-wrap { position: relative; height: 220px; }
+
+/* PAYOFF TAB */
+.payoff-info {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+.payoff-stat {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--rad); padding: 10px 12px;
+  text-align: center;
+}
+.ps-label { font-size: 9px; color: var(--text3); letter-spacing: 0.1em; margin-bottom: 4px; }
+.ps-value { font-size: 14px; font-weight: 600; }
+
+/* GREEKS CHART TAB */
+.greeks-charts-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* IV TAB */
+.iv-result-card {
+  background: var(--panel); border: 1px solid var(--amber);
+  border-radius: var(--rad); padding: 20px;
+  text-align: center; margin-bottom: 14px;
+  box-shadow: var(--glow-a);
+}
+.iv-result-label {
+  font-size: 10px; color: var(--amber); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.iv-result-value {
+  font-size: 42px; font-weight: 700; font-family: var(--display);
+  color: var(--amber);
+}
+.iv-result-sub { font-size: 11px; color: var(--text2); margin-top: 6px; }
+
+/* Loading overlay */
+.loading-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(2,11,20,0.85);
+  z-index: 200;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+  backdrop-filter: blur(4px);
+}
+.loading-overlay.show { display: flex; }
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading-text {
+  font-family: var(--display); font-size: 14px;
+  color: var(--green); letter-spacing: 0.1em;
+}
+.loading-sub { font-size: 11px; color: var(--text2); }
+
+/* Error bar */
+.error-bar {
+  display: none; padding: 10px 14px;
+  background: rgba(255,77,106,0.1);
+  border: 1px solid rgba(255,77,106,0.4);
+  border-radius: var(--rad);
+  color: var(--red); font-size: 11px;
+  margin-bottom: 12px;
+}
+.error-bar.show { display: block; }
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .greeks-grid { grid-template-columns: repeat(3,1fr); }
+  .summary-strip { grid-template-columns: repeat(3,1fr); }
+}
+
+/* Animate in */
+@keyframes fadeIn {
+  from { opacity:0; transform: translateY(8px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.animate-in { animation: fadeIn 0.3s ease forwards; }
+
+.no-data { color: var(--text3); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar">
+  <span class="nav-logo">BinomialPricer<span>.v2</span></span>
+  <div class="nav-divider"></div>
+  <span class="nav-ticker-display" id="navTicker">—</span>
+  <span class="nav-price-display" id="navPrice"></span>
+  <div class="nav-spacer"></div>
+  <div class="status-dot" id="statusDot"></div>
+  <span class="status-label" id="statusLabel">READY</span>
+  <div class="nav-divider"></div>
+  <span class="nav-time" id="navTime"></span>
+</nav>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">COMPUTING MODEL</div>
+  <div class="loading-sub" id="loadingStep">Initializing binomial tree...</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Stock Parameters -->
+    <div>
+      <div class="section-label">Stock Parameters</div>
+      <div class="input-group">
+        <div class="field">
+          <label>Ticker <span class="hint">display only</span></label>
+          <input type="text" id="ticker" value="AAPL" placeholder="e.g. AAPL" maxlength="10"/>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label>Stock Price (S₀) <span class="hint">$</span></label>
+            <input type="number" id="S0" value="213.50" min="0.01" step="0.01"/>
+          </div>
+          <div class="field">
+            <label>Div. Yield (q) <span class="hint">%</span></label>
+            <input type="number" id="q" value="0.44" min="0" step="0.01"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option Parameters -->
+    <div>
+      <div class="section-label">Option Parameters</div>
+      <div class="input-group">
+        <div class="row-2">
+          <div class="field">
+            <label>Strike Price (K) <span class="hint">$</span></label>
+            <input type="number" id="K" value="210.00" min="0.01" step="0.50"/>
+          </div>
+          <div class="field">
+            <label>Time to Exp. (T) <span class="hint">years</span></label>
+            <input type="number" id="T" value="0.25" min="0.001" max="5" step="0.01"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Option Type</label>
+          <div class="toggle-group" id="optionTypeToggle">
+            <button class="toggle-btn active red" data-val="put" onclick="setToggle('optionType','put',this)">PUT</button>
+            <button class="toggle-btn" data-val="call" onclick="setToggle('optionType','call',this)">CALL</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Exercise Style</label>
+          <div class="toggle-group" id="styleToggle">
+            <button class="toggle-btn active" data-val="american" onclick="setToggle('style','american',this)">AMERICAN</button>
+            <button class="toggle-btn" data-val="european" onclick="setToggle('style','european',this)">EUROPEAN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Parameters -->
+    <div>
+      <div class="section-label">Model Parameters</div>
+      <div class="input-group">
+        <div class="row-2">
+          <div class="field">
+            <label>Risk-Free Rate (r) <span class="hint">%</span></label>
+            <input type="number" id="r" value="5.25" min="0" max="30" step="0.01"/>
+          </div>
+          <div class="field">
+            <label>Volatility (σ) <span class="hint">%</span></label>
+            <input type="number" id="sigma" value="24.0" min="0.1" max="500" step="0.1"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Steps (N) <span class="hint">accuracy vs speed</span></label>
+          <select id="N">
+            <option value="50">50 — Fast preview</option>
+            <option value="100">100 — Balanced</option>
+            <option value="200" selected>200 — Recommended</option>
+            <option value="500">500 — High accuracy</option>
+            <option value="1000">1000 — Max precision</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- IV Mode -->
+    <div>
+      <div class="section-label">Implied Volatility</div>
+      <div class="input-group">
+        <div class="iv-mode-row">
+          <label>Solve for Implied Vol from Market Price</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ivMode" onchange="toggleIVMode()"/>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="field" id="marketPriceField" style="display:none;">
+          <label>Market Price (mid) <span class="hint">$</span></label>
+          <input type="number" id="marketPrice" value="5.80" min="0.01" step="0.01"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-bar" id="errorBar"></div>
+
+    <!-- CTA -->
+    <button class="btn-price" id="priceBtn" onclick="runModel()">
+      ▶ &nbsp;RUN PRICER
+    </button>
+
+  </aside>
+
+  <!-- CONTENT AREA -->
+  <div class="content">
+
+    <!-- SUMMARY STRIP -->
+    <div class="summary-strip">
+      <div class="summary-card highlight">
+        <div class="s-label">Model Price</div>
+        <div class="s-value green" id="sumModelPrice">—</div>
+        <div class="s-sub" id="sumStyle">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Black-Scholes EU</div>
+        <div class="s-value blue" id="sumBSPrice">—</div>
+        <div class="s-sub">European benchmark</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Intrinsic Value</div>
+        <div class="s-value amber" id="sumIntrinsic">—</div>
+        <div class="s-sub">Max(K-S,0)</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">EE Premium</div>
+        <div class="s-value" id="sumEEPrem">—</div>
+        <div class="s-sub" id="sumEENodes">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-label">Delta (Δ)</div>
+        <div class="s-value" id="sumDelta">—</div>
+        <div class="s-sub" id="sumMoneyness">—</div>
+      </div>
+    </div>
+
+    <!-- TAB NAV -->
+    <div class="tab-nav">
+      <button class="tab active" onclick="switchTab('price')">Pricing</button>
+      <button class="tab" onclick="switchTab('greeks')">Greeks</button>
+      <button class="tab" onclick="switchTab('convergence')">Convergence</button>
+      <button class="tab" onclick="switchTab('payoff')">Payoff Chart</button>
+      <button class="tab" onclick="switchTab('gchart')">Greeks Surface</button>
+      <button class="tab" onclick="switchTab('iv')">Implied Vol</button>
+    </div>
+
+    <!-- TAB PANELS -->
+    <div class="tab-panels">
+
+      <!-- PRICE TAB -->
+      <div class="tab-panel active" id="tab-price">
+        <div id="priceContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">◈</div>
+            <div class="placeholder-text">Configure parameters and run the pricer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GREEKS TAB -->
+      <div class="tab-panel" id="tab-greeks">
+        <div id="greeksContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">Δ</div>
+            <div class="placeholder-text">Greeks computed via central finite differences</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONVERGENCE TAB -->
+      <div class="tab-panel" id="tab-convergence">
+        <div id="convergenceContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">≋</div>
+            <div class="placeholder-text">Convergence analysis across N values</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAYOFF TAB -->
+      <div class="tab-panel" id="tab-payoff">
+        <div id="payoffContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">⌃</div>
+            <div class="placeholder-text">Option value vs underlying stock price</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GREEKS CHART TAB -->
+      <div class="tab-panel" id="tab-gchart">
+        <div id="gchartContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">∂</div>
+            <div class="placeholder-text">Greeks as a function of stock price</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IV TAB -->
+      <div class="tab-panel" id="tab-iv">
+        <div id="ivContent">
+          <div class="placeholder">
+            <div class="placeholder-icon">σ</div>
+            <div class="placeholder-text">Enable IV mode and run the pricer</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const state = {
+  optionType: 'put',
+  style: 'american',
+  results: null,
+};
+
+const charts = {};
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+const fmt = (v, d=4) => isNaN(v) ? 'N/A' : v.toFixed(d);
+const fmtD = (v, d=2) => isNaN(v) ? 'N/A' : v.toFixed(d);
+const fmtPct = (v) => isNaN(v) ? 'N/A' : (v*100).toFixed(2) + '%';
+const fmtDollar = (v, d=4) => isNaN(v) ? 'N/A' : '$' + Math.abs(v).toFixed(d);
+
+function normCDF(x) {
+  const t = 1.0 / (1.0 + 0.2316419 * Math.abs(x));
+  const poly = t * (0.319381530 + t * (-0.356563782
+               + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  const res = 1.0 - (1.0 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * x * x) * poly;
+  return x >= 0 ? res : 1.0 - res;
+}
+
+// ─────────────────────────────────────────────
+//  BINOMIAL ENGINE (CRR)
+// ─────────────────────────────────────────────
+function binomialPrice(S0, K, T, r, sigma, q=0.0, N=200, optionType='put', style='american') {
+  if (T <= 0) {
+    const p = optionType === 'call' ? Math.max(S0-K,0) : Math.max(K-S0,0);
+    return { price: p, u: 1, d: 1, p: 0.5, earlyExNodes: 0 };
+  }
+
+  const dt   = T / N;
+  const u    = Math.exp(sigma * Math.sqrt(dt));
+  const d    = 1.0 / u;
+  const disc = Math.exp(-r * dt);
+  const p    = (Math.exp((r - q) * dt) - d) / (u - d);
+
+  if (p <= 0 || p >= 1) throw new Error(`p=${p.toFixed(4)} outside (0,1). Check params.`);
+
+  // Terminal payoffs
+  const V = new Float64Array(N + 1);
+  for (let j = 0; j <= N; j++) {
+    const ST = S0 * Math.pow(u, j) * Math.pow(d, N - j);
+    V[j] = optionType === 'call' ? Math.max(ST - K, 0) : Math.max(K - ST, 0);
+  }
+
+  let earlyExNodes = 0;
+
+  // Backward induction
+  for (let i = N - 1; i >= 0; i--) {
+    for (let j = 0; j <= i; j++) {
+      V[j] = disc * (p * V[j + 1] + (1 - p) * V[j]);
+      if (style === 'american') {
+        const Si = S0 * Math.pow(u, j) * Math.pow(d, i - j);
+        const intr = optionType === 'call' ? Math.max(Si - K, 0) : Math.max(K - Si, 0);
+        if (intr > V[j]) { V[j] = intr; earlyExNodes++; }
+      }
+    }
+  }
+
+  return { price: V[0], u, d, p, dt, N, earlyExNodes };
+}
+
+// ─────────────────────────────────────────────
+//  BLACK-SCHOLES
+// ─────────────────────────────────────────────
+function blackScholes(S0, K, T, r, sigma, q=0.0, optionType='put') {
+  if (T <= 0) return optionType === 'call' ? Math.max(S0-K,0) : Math.max(K-S0,0);
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(S0/K) + (r - q + 0.5*sigma*sigma)*T) / (sigma*sqrtT);
+  const d2 = d1 - sigma*sqrtT;
+  if (optionType === 'call') {
+    return S0*Math.exp(-q*T)*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
+  } else {
+    return K*Math.exp(-r*T)*normCDF(-d2) - S0*Math.exp(-q*T)*normCDF(-d1);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GREEKS (central finite differences)
+// ─────────────────────────────────────────────
+function computeGreeks(S0, K, T, r, sigma, q=0.0, N=200, optionType='put', style='american') {
+  const V0  = binomialPrice(S0, K, T, r, sigma, q, N, optionType, style).price;
+
+  // Delta & Gamma
+  const dS  = S0 * 0.01;
+  const Vu  = binomialPrice(S0+dS, K, T, r, sigma, q, N, optionType, style).price;
+  const Vd  = binomialPrice(S0-dS, K, T, r, sigma, q, N, optionType, style).price;
+  const delta = (Vu - Vd) / (2*dS);
+  const gamma = (Vu - 2*V0 + Vd) / (dS*dS);
+
+  // Theta
+  let theta = NaN;
+  const dtB = 1/365;
+  if (T > dtB) {
+    const Vt = binomialPrice(S0, K, T-dtB, r, sigma, q, N, optionType, style).price;
+    theta = Vt - V0;
+  }
+
+  // Vega
+  const dSig = 0.01;
+  const Vvs = binomialPrice(S0, K, T, r, sigma+dSig, q, N, optionType, style).price;
+  const Vvd = binomialPrice(S0, K, T, r, sigma-dSig, q, N, optionType, style).price;
+  const vega = (Vvs - Vvd) / (2*dSig) * 0.01;
+
+  // Rho
+  const dr  = 0.01;
+  const Vru = binomialPrice(S0, K, T, r+dr, sigma, q, N, optionType, style).price;
+  const Vrd = binomialPrice(S0, K, T, r-dr, sigma, q, N, optionType, style).price;
+  const rho = (Vru - Vrd) / (2*dr) * 0.01;
+
+  return { price: V0, delta, gamma, theta, vega, rho };
+}
+
+// ─────────────────────────────────────────────
+//  IMPLIED VOLATILITY (Brent's method)
+// ─────────────────────────────────────────────
+function impliedVol(marketPrice, S0, K, T, r, q=0.0, optionType='put', style='american', N=100) {
+  if (marketPrice <= 0 || isNaN(marketPrice)) return NaN;
+  const intrinsic = optionType === 'put' ? Math.max(K-S0,0) : Math.max(S0-K,0);
+  if (marketPrice < intrinsic - 1e-6) return NaN;
+
+  const obj = (sig) => {
+    try { return binomialPrice(S0,K,T,r,sig,q,N,optionType,style).price - marketPrice; }
+    catch(e) { return NaN; }
+  };
+
+  let a = 1e-4, b = 10.0;
+  let fa = obj(a), fb = obj(b);
+  if (isNaN(fa) || isNaN(fb) || fa*fb > 0) return NaN;
+
+  for (let i = 0; i < 100; i++) {
+    const c = (a+b)/2;
+    const fc = obj(c);
+    if (isNaN(fc)) return NaN;
+    if (Math.abs(fc) < 1e-6 || (b-a)/2 < 1e-7) return c;
+    if (fa*fc < 0) { b = c; fb = fc; } else { a = c; fa = fc; }
+  }
+  return (a+b)/2;
+}
+
+// ─────────────────────────────────────────────
+//  CONVERGENCE
+// ─────────────────────────────────────────────
+function runConvergence(S0, K, T, r, sigma, q, optionType) {
+  const nList = [10, 25, 50, 100, 200, 500, 1000];
+  const bsEu  = blackScholes(S0, K, T, r, sigma, q, optionType);
+  const eurPx = [], amePx = [];
+
+  for (const N of nList) {
+    eurPx.push(binomialPrice(S0,K,T,r,sigma,q,N,optionType,'european').price);
+    amePx.push(binomialPrice(S0,K,T,r,sigma,q,N,optionType,'american').price);
+  }
+
+  return { nList, eurPx, amePx, bsEu };
+}
+
+// ─────────────────────────────────────────────
+//  PAYOFF SURFACE DATA
+// ─────────────────────────────────────────────
+function payoffData(S0, K, T, r, sigma, q, N, optionType) {
+  const sMin = S0 * 0.3, sMax = S0 * 1.7;
+  const pts = 50;
+  const sArr = [], eurArr = [], ameArr = [], intrArr = [];
+
+  for (let i = 0; i < pts; i++) {
+    const S = sMin + (sMax-sMin)*i/(pts-1);
+    sArr.push(parseFloat(S.toFixed(2)));
+    eurArr.push(binomialPrice(S,K,T,r,sigma,q,N,optionType,'european').price);
+    ameArr.push(binomialPrice(S,K,T,r,sigma,q,N,optionType,'american').price);
+    intrArr.push(optionType==='call' ? Math.max(S-K,0) : Math.max(K-S,0));
+  }
+  return { sArr, eurArr, ameArr, intrArr };
+}
+
+// ─────────────────────────────────────────────
+//  GREEKS SURFACE DATA
+// ─────────────────────────────────────────────
+function greeksSurfaceData(S0, K, T, r, sigma, q, N, optionType) {
+  const sMin = S0*0.5, sMax = S0*1.5;
+  const pts = 30;
+  const sArr = [], deltaArr = [], gammaArr = [], thetaArr = [], vegaArr = [], rhoArr = [];
+
+  for (let i = 0; i < pts; i++) {
+    const S = sMin + (sMax-sMin)*i/(pts-1);
+    sArr.push(parseFloat(S.toFixed(2)));
+    const g = computeGreeks(S, K, T, r, sigma, q, Math.min(N,100), optionType, 'american');
+    deltaArr.push(g.delta);
+    gammaArr.push(g.gamma);
+    thetaArr.push(g.theta);
+    vegaArr.push(g.vega);
+    rhoArr.push(g.rho);
+  }
+  return { sArr, deltaArr, gammaArr, thetaArr, vegaArr, rhoArr };
+}
+
+// ─────────────────────────────────────────────
+//  UI HELPERS
+// ─────────────────────────────────────────────
+let currentTab = 'price';
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['price','greeks','convergence','payoff','gchart','iv'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-'+name);
+  });
+}
+
+function setToggle(key, val, btn) {
+  state[key] = val;
+  const group = btn.parentElement;
+  group.querySelectorAll('.toggle-btn').forEach(b => {
+    b.classList.remove('active','red');
+  });
+  btn.classList.add('active');
+  if (key === 'optionType' && val === 'put') btn.classList.add('red');
+}
+
+function toggleIVMode() {
+  const on = document.getElementById('ivMode').checked;
+  document.getElementById('marketPriceField').style.display = on ? 'block' : 'none';
+  document.getElementById('sigma').closest('.field').style.opacity = on ? '0.5' : '1';
+  document.getElementById('sigma').readOnly = on;
+}
+
+function getInputs() {
+  return {
+    S0:    parseFloat(document.getElementById('S0').value),
+    K:     parseFloat(document.getElementById('K').value),
+    T:     parseFloat(document.getElementById('T').value),
+    r:     parseFloat(document.getElementById('r').value) / 100,
+    sigma: parseFloat(document.getElementById('sigma').value) / 100,
+    q:     parseFloat(document.getElementById('q').value) / 100,
+    N:     parseInt(document.getElementById('N').value),
+    optionType: state.optionType,
+    style:      state.style,
+    marketPrice: parseFloat(document.getElementById('marketPrice').value),
+    ticker: document.getElementById('ticker').value.toUpperCase(),
+    ivMode: document.getElementById('ivMode').checked,
+  };
+}
+
+function setStatus(text, color='green') {
+  document.getElementById('statusLabel').textContent = text;
+  document.getElementById('statusDot').style.background = `var(--${color})`;
+  document.getElementById('statusDot').style.boxShadow = `0 0 8px var(--${color})`;
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBar');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+function setLoadingStep(text) {
+  document.getElementById('loadingStep').textContent = text;
+}
+
+// ─────────────────────────────────────────────
+//  CHART HELPERS
+// ─────────────────────────────────────────────
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      labels: { color: '#6a89a8', font: { family: 'JetBrains Mono', size: 10 }, boxWidth: 12 }
+    },
+    tooltip: {
+      backgroundColor: '#0d1825',
+      borderColor: '#1a3050',
+      borderWidth: 1,
+      titleColor: '#c8daf0',
+      bodyColor: '#6a89a8',
+      titleFont: { family: 'JetBrains Mono', size: 11 },
+      bodyFont: { family: 'JetBrains Mono', size: 10 },
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(26,48,80,0.6)' },
+      ticks: { color: '#4a5568', font: { family: 'JetBrains Mono', size: 9 } }
+    },
+    y: {
+      grid: { color: 'rgba(26,48,80,0.6)' },
+      ticks: { color: '#4a5568', font: { family: 'JetBrains Mono', size: 9 } }
+    }
+  }
+};
+
+function makeChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  charts[id] = new Chart(canvas.getContext('2d'), config);
+  return charts[id];
+}
+
+// ─────────────────────────────────────────────
+//  RENDER FUNCTIONS
+// ─────────────────────────────────────────────
+function renderPrice(r, inp) {
+  const intrinsic = inp.optionType==='call' ? Math.max(inp.S0-inp.K,0) : Math.max(inp.K-inp.S0,0);
+  const eePrem    = Math.max(r.binPrice - r.bsEuropean, 0);
+  const moneyness = inp.optionType==='call' ? (inp.S0-inp.K) : (inp.K-inp.S0);
+
+  document.getElementById('sumModelPrice').textContent = '$' + fmt(r.binPrice, 4);
+  document.getElementById('sumStyle').textContent = inp.style.charAt(0).toUpperCase()+inp.style.slice(1) + ' · ' + inp.optionType.toUpperCase();
+  document.getElementById('sumBSPrice').textContent = '$' + fmt(r.bsEuropean, 4);
+  document.getElementById('sumIntrinsic').textContent = '$' + fmt(intrinsic, 4);
+  const eeEl = document.getElementById('sumEEPrem');
+  eeEl.textContent = '$' + fmt(eePrem, 4);
+  eeEl.className = 's-value ' + (eePrem > 0.001 ? 'green' : '');
+  document.getElementById('sumEENodes').textContent = r.earlyExNodes + ' early exercise nodes';
+  document.getElementById('sumDelta').textContent = fmt(r.greeks.delta, 4);
+  document.getElementById('sumDelta').className = 's-value ' + (r.greeks.delta >= 0 ? 'green' : 'red');
+  document.getElementById('sumMoneyness').textContent = moneyness > 0 ? 'In The Money' : moneyness < 0 ? 'Out of The Money' : 'At The Money';
+
+  // Nav
+  document.getElementById('navTicker').textContent = inp.ticker;
+  document.getElementById('navPrice').textContent = '  $' + inp.S0.toFixed(2);
+
+  document.getElementById('priceContent').innerHTML = `
+    <div class="animate-in">
+      <div class="price-grid">
+        <div class="price-card green-card">
+          <div class="pc-label">Binomial Model Price</div>
+          <div class="pc-value green">$${fmt(r.binPrice,4)}</div>
+          <div class="pc-sub">${inp.style.charAt(0).toUpperCase()+inp.style.slice(1)} · ${inp.N} steps · CRR</div>
+        </div>
+        <div class="price-card blue-card">
+          <div class="pc-label">Black-Scholes European</div>
+          <div class="pc-value blue">$${fmt(r.bsEuropean,4)}</div>
+          <div class="pc-sub">Closed-form benchmark</div>
+        </div>
+        <div class="price-card amber-card">
+          <div class="pc-label">Intrinsic Value</div>
+          <div class="pc-value amber">$${fmt(intrinsic,4)}</div>
+          <div class="pc-sub">${inp.optionType==='put' ? 'max(K-S, 0)' : 'max(S-K, 0)'}</div>
+        </div>
+        <div class="price-card ${eePrem>0.001?'green-card':''}">
+          <div class="pc-label">Early Exercise Premium</div>
+          <div class="pc-value ${eePrem>0.001?'green':''}">$${fmt(eePrem,4)}</div>
+          <div class="pc-sub">${r.earlyExNodes} nodes exercised early</div>
+        </div>
+      </div>
+
+      <div class="params-table" style="margin-bottom:14px;">
+        <div class="params-table-title">Binomial Tree Parameters</div>
+        <div class="params-row"><span class="pr-key">u (up factor)</span><span class="pr-val">${fmt(r.u,6)}</span></div>
+        <div class="params-row"><span class="pr-key">d (down factor)</span><span class="pr-val">${fmt(r.d,6)}</span></div>
+        <div class="params-row"><span class="pr-key">p (risk-neutral prob.)</span><span class="pr-val green">${fmt(r.p,6)}</span></div>
+        <div class="params-row"><span class="pr-key">dt (time per step)</span><span class="pr-val">${fmt(r.dt,6)} yrs</span></div>
+        <div class="params-row"><span class="pr-key">N (total nodes)</span><span class="pr-val">${inp.N * (inp.N+1) / 2} terminal nodes</span></div>
+        <div class="params-row"><span class="pr-key">|Binomial EU − BS|</span><span class="pr-val amber">$${fmt(Math.abs(r.bsEuropeanBinomial - r.bsEuropean),5)}</span></div>
+      </div>
+
+      <div class="section-label" style="margin-bottom:10px;">No-Arbitrage Checks</div>
+      <div class="checks-grid">
+        <div class="check-item">
+          <div class="check-dot ${r.binPrice >= r.bsEuropean - 1e-6 ? 'pass':'fail'}"></div>
+          <div class="check-text">Am ≥ Eu<br><span style="color:var(--text3)">${fmt(r.binPrice,4)} ≥ ${fmt(r.bsEuropean,4)}</span></div>
+        </div>
+        <div class="check-item">
+          <div class="check-dot ${r.binPrice >= intrinsic - 1e-6 ? 'pass':'fail'}"></div>
+          <div class="check-text">Am ≥ Intrinsic<br><span style="color:var(--text3)">${fmt(r.binPrice,4)} ≥ ${fmt(intrinsic,4)}</span></div>
+        </div>
+        <div class="check-item">
+          <div class="check-dot ${Math.abs(r.bsEuropeanBinomial - r.bsEuropean) < 0.05 ? 'pass':'fail'}"></div>
+          <div class="check-text">EU ≈ BS<br><span style="color:var(--text3)">Δ = $${fmt(Math.abs(r.bsEuropeanBinomial-r.bsEuropean),5)}</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderGreeks(r, inp) {
+  const g = r.greeks;
+  const cards = [
+    { sym:'Δ', name:'Delta', key:'delta', color:'--green',
+      desc:'Rate of price change per $1 move in underlying', scale:[-1,1] },
+    { sym:'Γ', name:'Gamma', key:'gamma', color:'--amber',
+      desc:'Rate of delta change per $1 move in underlying', scale:[0,0.1] },
+    { sym:'Θ', name:'Theta', key:'theta', color:'--red',
+      desc:'Daily P&L decay from time passing ($ per day)', scale:[-1,0] },
+    { sym:'V', name:'Vega', key:'vega', color:'--blue',
+      desc:'P&L per 1% move in implied volatility', scale:[0,1] },
+    { sym:'ρ', name:'Rho', key:'rho', color:'--purple',
+      desc:'P&L per 1% move in risk-free rate', scale:[-1,1] },
+  ];
+
+  const cardsHTML = cards.map(c => {
+    const val = g[c.key];
+    const pct = isNaN(val) ? 50 :
+      Math.min(100, Math.max(0,
+        ((val - c.scale[0]) / (c.scale[1]-c.scale[0])) * 100
+      ));
+    return `
+      <div class="greek-card animate-in">
+        <div class="greek-symbol" style="color:var(${c.color})">${c.sym}</div>
+        <div class="greek-name">${c.name}</div>
+        <div class="greek-value" style="color:var(${c.color})">${isNaN(val)?'N/A':(val>0?'+':'')+fmt(val,5)}</div>
+        <div class="greek-bar-track">
+          <div class="greek-bar-fill" style="width:${pct}%;background:var(${c.color})"></div>
+        </div>
+        <div class="greek-desc">${c.desc}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('greeksContent').innerHTML = `
+    <div class="animate-in">
+      <div class="greeks-grid">${cardsHTML}</div>
+      <div class="params-table">
+        <div class="params-table-title">Greeks Summary — ${inp.style.charAt(0).toUpperCase()+inp.style.slice(1)} ${inp.optionType.toUpperCase()} | K=${inp.K} | T=${inp.T}y | σ=${(inp.sigma*100).toFixed(1)}%</div>
+        <div class="params-row"><span class="pr-key">Δ Delta</span><span class="pr-val ${g.delta>=0?'green':'red'}">${fmt(g.delta,6)}</span></div>
+        <div class="params-row"><span class="pr-key">Γ Gamma</span><span class="pr-val amber">${fmt(g.gamma,6)}</span></div>
+        <div class="params-row"><span class="pr-key">Θ Theta ($/day)</span><span class="pr-val red">${isNaN(g.theta)?'N/A':fmt(g.theta,6)}</span></div>
+        <div class="params-row"><span class="pr-key">V Vega (per 1% σ)</span><span class="pr-val blue">${fmt(g.vega,6)}</span></div>
+        <div class="params-row"><span class="pr-key">ρ Rho (per 1% r)</span><span class="pr-val" style="color:var(--purple)">${fmt(g.rho,6)}</span></div>
+        <div class="params-row"><span class="pr-key">Method</span><span class="pr-val">Central finite differences</span></div>
+      </div>
+    </div>`;
+}
+
+function renderConvergence(r) {
+  const cv = r.convergence;
+  document.getElementById('convergenceContent').innerHTML = `
+    <div class="animate-in">
+      <div class="chart-container">
+        <div class="chart-title">Option Price vs Number of Steps (N)</div>
+        <div class="chart-canvas-wrap"><canvas id="cvChart1"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">European Pricing Error |Binomial − Black-Scholes| (log scale)</div>
+        <div class="chart-canvas-wrap"><canvas id="cvChart2"></canvas></div>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    const base = JSON.parse(JSON.stringify(chartDefaults));
+
+    makeChart('cvChart1', {
+      type: 'line',
+      data: {
+        labels: cv.nList,
+        datasets: [
+          { label:'European (Binomial)', data: cv.eurPx, borderColor:'#4da6ff',
+            backgroundColor:'rgba(77,166,255,0.08)', borderWidth:2, pointRadius:4, tension:0.2 },
+          { label:'American (Binomial)', data: cv.amePx, borderColor:'#f5a623',
+            backgroundColor:'rgba(245,166,35,0.08)', borderWidth:2, pointRadius:4, tension:0.2 },
+          { label:`Black-Scholes EU: $${fmt(cv.bsEu,4)}`, data: cv.nList.map(()=>cv.bsEu),
+            borderColor:'#00e5b0', borderWidth:1.5, borderDash:[5,3], pointRadius:0 }
+        ]
+      },
+      options: { ...base, plugins: { ...base.plugins } }
+    });
+
+    const errors = cv.eurPx.map(p => Math.max(Math.abs(p - cv.bsEu), 1e-6));
+    makeChart('cvChart2', {
+      type: 'line',
+      data: {
+        labels: cv.nList,
+        datasets: [{
+          label:'|EU Binomial − BS|', data: errors,
+          borderColor:'#ff4d6a', backgroundColor:'rgba(255,77,106,0.08)',
+          borderWidth:2, pointRadius:4, tension:0.2
+        }]
+      },
+      options: {
+        ...base,
+        scales: {
+          x: base.scales.x,
+          y: { ...base.scales.y, type:'logarithmic',
+               ticks: { ...base.scales.y.ticks,
+                 callback: v => v < 0.01 ? v.toExponential(1) : v.toFixed(3) } }
+        }
+      }
+    });
+  }, 50);
+}
+
+function renderPayoff(r, inp) {
+  const pd = r.payoff;
+  const eePremAreas = pd.sArr.map((s,i) => Math.max(pd.ameArr[i]-pd.eurArr[i],0));
+  const maxEE = Math.max(...eePremAreas);
+  const maxPrem = Math.max(...pd.ameArr);
+
+  document.getElementById('payoffContent').innerHTML = `
+    <div class="animate-in">
+      <div class="payoff-info">
+        <div class="payoff-stat">
+          <div class="ps-label">Max Option Value</div>
+          <div class="ps-value green">$${fmt(maxPrem,2)}</div>
+        </div>
+        <div class="payoff-stat">
+          <div class="ps-label">Max EE Premium</div>
+          <div class="ps-value amber">$${fmt(maxEE,4)}</div>
+        </div>
+        <div class="payoff-stat">
+          <div class="ps-label">Strike / Current</div>
+          <div class="ps-value">$${inp.K} / $${inp.S0}</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">Option Value vs Stock Price — ${inp.optionType.toUpperCase()} | K=${inp.K} | T=${inp.T}y | σ=${(inp.sigma*100).toFixed(0)}%</div>
+        <div class="chart-canvas-wrap" style="height:280px"><canvas id="payoffChart"></canvas></div>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    const base = JSON.parse(JSON.stringify(chartDefaults));
+    makeChart('payoffChart', {
+      type: 'line',
+      data: {
+        labels: pd.sArr,
+        datasets: [
+          { label:'American (Binomial)', data: pd.ameArr, borderColor:'#f5a623',
+            backgroundColor:'rgba(245,166,35,0.06)', borderWidth:2.5, pointRadius:0, tension:0.1, fill:false },
+          { label:'European (Binomial)', data: pd.eurArr, borderColor:'#4da6ff',
+            backgroundColor:'rgba(77,166,255,0.06)', borderWidth:2, borderDash:[5,3], pointRadius:0, tension:0.1, fill:false },
+          { label:'Intrinsic Value', data: pd.intrArr, borderColor:'#3d5a78',
+            borderWidth:1.5, borderDash:[3,3], pointRadius:0, fill:false },
+        ]
+      },
+      options: {
+        ...base,
+        plugins: {
+          ...base.plugins,
+          annotation: undefined,
+        },
+        scales: {
+          x: { ...base.scales.x,
+               ticks: { ...base.scales.x.ticks,
+                 callback: (v,i) => i % 10 === 0 ? '$'+pd.sArr[i].toFixed(0) : '' } },
+          y: { ...base.scales.y,
+               ticks: { ...base.scales.y.ticks,
+                 callback: v => '$'+v.toFixed(2) } }
+        }
+      }
+    });
+  }, 50);
+}
+
+function renderGreeksChart(r, inp) {
+  const gd = r.greeksSurface;
+  const datasets = [
+    { key:'deltaArr', label:'Δ Delta', color:'#00e5b0', id:'gcDelta' },
+    { key:'gammaArr', label:'Γ Gamma', color:'#f5a623', id:'gcGamma' },
+    { key:'thetaArr', label:'Θ Theta ($/day)', color:'#ff4d6a', id:'gcTheta' },
+    { key:'vegaArr',  label:'V Vega', color:'#4da6ff', id:'gcVega' },
+    { key:'rhoArr',   label:'ρ Rho', color:'#9b6dff', id:'gcRho' },
+  ];
+
+  document.getElementById('gchartContent').innerHTML = `
+    <div class="animate-in">
+      <div class="greeks-charts-grid">
+        ${datasets.map(d => `
+          <div class="chart-container">
+            <div class="chart-title">${d.label} vs Stock Price</div>
+            <div class="chart-canvas-wrap" style="height:160px"><canvas id="${d.id}"></canvas></div>
+          </div>`).join('')}
+        <div class="chart-container" style="display:flex;align-items:center;justify-content:center;opacity:0.4;">
+          <div style="text-align:center">
+            <div style="font-size:20px;margin-bottom:8px">∂</div>
+            <div style="font-size:10px;color:var(--text3)">N=${Math.min(parseInt(document.getElementById('N').value),100)} steps used for speed</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    datasets.forEach(d => {
+      const base = JSON.parse(JSON.stringify(chartDefaults));
+      makeChart(d.id, {
+        type: 'line',
+        data: {
+          labels: gd.sArr,
+          datasets: [{
+            label: d.label,
+            data: gd[d.key],
+            borderColor: d.color,
+            backgroundColor: d.color + '15',
+            borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true
+          }]
+        },
+        options: {
+          ...base,
+          plugins: {
+            ...base.plugins,
+            legend: { display: false }
+          },
+          scales: {
+            x: { ...base.scales.x,
+                 ticks: { ...base.scales.x.ticks,
+                   callback: (v,i) => i%10===0 ? '$'+gd.sArr[i].toFixed(0) : '' } },
+            y: { ...base.scales.y }
+          }
+        }
+      });
+    });
+  }, 50);
+}
+
+function renderIV(r, inp) {
+  const ivMode = inp.ivMode;
+  const ivVal  = r.impliedVol;
+  const bsIV   = isNaN(ivVal) ? NaN :
+    blackScholes(inp.S0, inp.K, inp.T, inp.r, ivVal, inp.q, inp.optionType);
+
+  if (!ivMode) {
+    document.getElementById('ivContent').innerHTML = `
+      <div style="padding:30px;text-align:center;opacity:0.5">
+        <div style="font-size:18px;margin-bottom:8px">σ</div>
+        <div style="font-size:11px;color:var(--text2)">Enable "Solve for Implied Vol" in the sidebar and enter a market price</div>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('ivContent').innerHTML = `
+    <div class="animate-in">
+      <div class="iv-result-card">
+        <div class="iv-result-label">Implied Volatility (American-Adjusted)</div>
+        <div class="iv-result-value">${isNaN(ivVal) ? 'N/A' : (ivVal*100).toFixed(3) + '%'}</div>
+        <div class="iv-result-sub">Solved via Brent's method | Binomial model as pricing function</div>
+      </div>
+      <div class="params-table">
+        <div class="params-table-title">IV Solve Details</div>
+        <div class="params-row"><span class="pr-key">Market Price (mid)</span><span class="pr-val">$${fmt(inp.marketPrice,4)}</span></div>
+        <div class="params-row"><span class="pr-key">Implied Vol (σ_IV)</span><span class="pr-val amber">${isNaN(ivVal)?'No solution':(ivVal*100).toFixed(4)+'%'}</span></div>
+        <div class="params-row"><span class="pr-key">Model reprice at σ_IV</span><span class="pr-val green">${isNaN(ivVal)?'N/A':'$'+fmt(bsIV,4)}</span></div>
+        <div class="params-row"><span class="pr-key">Historical σ (entered)</span><span class="pr-val">${(inp.sigma*100).toFixed(2)}%</span></div>
+        <div class="params-row"><span class="pr-key">Vol Premium (IV − Hist)</span><span class="pr-val ${isNaN(ivVal)?'':(ivVal-inp.sigma)>0?'red':'green'}">${isNaN(ivVal)?'N/A':((ivVal-inp.sigma)*100).toFixed(2)+'%'}</span></div>
+        <div class="params-row"><span class="pr-key">Method</span><span class="pr-val">Brent bisection · tol=1e-6</span></div>
+      </div>
+      <div class="params-table" style="margin-top:14px;">
+        <div class="params-table-title">Put-Call Parity Check (European)</div>
+        <div class="params-row"><span class="pr-key">Call price (BS)</span><span class="pr-val">${isNaN(ivVal)?'N/A':'$'+fmt(blackScholes(inp.S0,inp.K,inp.T,inp.r,ivVal,inp.q,'call'),4)}</span></div>
+        <div class="params-row"><span class="pr-key">Put price (BS)</span><span class="pr-val">${isNaN(ivVal)?'N/A':'$'+fmt(blackScholes(inp.S0,inp.K,inp.T,inp.r,ivVal,inp.q,'put'),4)}</span></div>
+        <div class="params-row"><span class="pr-key">C - P</span><span class="pr-val">${isNaN(ivVal)?'N/A':'$'+fmt(blackScholes(inp.S0,inp.K,inp.T,inp.r,ivVal,inp.q,'call')-blackScholes(inp.S0,inp.K,inp.T,inp.r,ivVal,inp.q,'put'),4)}</span></div>
+        <div class="params-row"><span class="pr-key">S·e^(-qT) - K·e^(-rT)</span><span class="pr-val">${fmt(inp.S0*Math.exp(-inp.q*inp.T)-inp.K*Math.exp(-inp.r*inp.T),4)}</span></div>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────
+//  MAIN: RUN MODEL
+// ─────────────────────────────────────────────
+async function runModel() {
+  const btn = document.getElementById('priceBtn');
+  const overlay = document.getElementById('loadingOverlay');
+  btn.classList.add('loading');
+  btn.textContent = '';
+  overlay.classList.add('show');
+  setStatus('COMPUTING', 'amber');
+
+  // Let DOM update
+  await new Promise(r => setTimeout(r, 20));
+
+  try {
+    const inp = getInputs();
+
+    // Validate
+    if (inp.S0 <= 0 || inp.K <= 0 || inp.T <= 0 || inp.sigma <= 0)
+      throw new Error('All parameters must be positive.');
+    if (inp.r < 0) throw new Error('Risk-free rate cannot be negative.');
+
+    // ---- Pricing ----
+    setLoadingStep('Running CRR binomial tree...');
+    await new Promise(r => setTimeout(r, 10));
+    const result = binomialPrice(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q,
+                                  inp.N, inp.optionType, inp.style);
+
+    setLoadingStep('Computing Black-Scholes benchmark...');
+    await new Promise(r => setTimeout(r, 10));
+    const bsEu = blackScholes(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q, inp.optionType);
+    const bsEuBin = binomialPrice(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q,
+                                   inp.N, inp.optionType, 'european').price;
+
+    // ---- Greeks ----
+    setLoadingStep('Computing Greeks via finite differences...');
+    await new Promise(r => setTimeout(r, 10));
+    const greeks = computeGreeks(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q,
+                                  inp.N, inp.optionType, inp.style);
+
+    // ---- Convergence ----
+    setLoadingStep('Running convergence analysis...');
+    await new Promise(r => setTimeout(r, 10));
+    const convergence = runConvergence(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q, inp.optionType);
+
+    // ---- Payoff data ----
+    setLoadingStep('Building payoff surface...');
+    await new Promise(r => setTimeout(r, 10));
+    const payoff = payoffData(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q,
+                              Math.min(inp.N, 100), inp.optionType);
+
+    // ---- Greeks surface ----
+    setLoadingStep('Computing Greeks surface...');
+    await new Promise(r => setTimeout(r, 10));
+    const greeksSurface = greeksSurfaceData(inp.S0, inp.K, inp.T, inp.r, inp.sigma, inp.q,
+                                            Math.min(inp.N, 100), inp.optionType);
+
+    // ---- IV ----
+    let ivResult = NaN;
+    if (inp.ivMode) {
+      setLoadingStep('Solving implied volatility (Brent)...');
+      await new Promise(r => setTimeout(r, 10));
+      ivResult = impliedVol(inp.marketPrice, inp.S0, inp.K, inp.T, inp.r, inp.q,
+                            inp.optionType, inp.style, Math.min(inp.N, 100));
+    }
+
+    const results = {
+      binPrice: result.price,
+      bsEuropean: bsEu,
+      bsEuropeanBinomial: bsEuBin,
+      u: result.u, d: result.d, p: result.p, dt: result.dt,
+      earlyExNodes: result.earlyExNodes,
+      greeks, convergence, payoff, greeksSurface,
+      impliedVol: ivResult,
+    };
+
+    state.results = results;
+
+    // Render all tabs
+    setLoadingStep('Rendering dashboard...');
+    await new Promise(r => setTimeout(r, 10));
+
+    renderPrice(results, inp);
+    renderGreeks(results, inp);
+    renderConvergence(results);
+    renderPayoff(results, inp);
+    renderGreeksChart(results, inp);
+    renderIV(results, inp);
+
+    setStatus('PRICED', 'green');
+
+  } catch (err) {
+    showError(err.message || 'Unexpected error. Check inputs.');
+    setStatus('ERROR', 'red');
+    console.error(err);
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = '▶  RUN PRICER';
+    overlay.classList.remove('show');
+  }
+}
+
+// ─────────────────────────────────────────────
+//  CLOCK
+// ─────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('navTime').textContent =
+    now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Run on Enter
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) runModel();
+});
+</script>
+</body>
+</html>
